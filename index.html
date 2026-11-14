@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Uploader</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col justify-between p-6">
+
+    <div class="max-w-md w-full mx-auto space-y-6">
+        <!-- Header -->
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight">Upload Content</h1>
+            <p class="text-sm text-gray-400 mt-1">Add title, link, or media files for the system.</p>
+        </div>
+
+        <!-- Form -->
+        <form id="uploadForm" class="space-y-4">
+            <!-- Title Input -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Content Title *</label>
+                <input type="text" id="title" required placeholder="e.g. poker night" 
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <!-- Link Input (for ideas) -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Reference Link (TikTok / IG)</label>
+                <input type="url" id="link" placeholder="https://instagram.com/p/..." 
+                    class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <!-- File Picker -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Media Files (Photos / Videos)</label>
+                <input type="file" id="files" multiple accept="image/*,video/*" 
+                    class="w-full text-sm text-gray-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer cursor-pointer bg-gray-800 border border-gray-700 rounded-lg">
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="submitBtn" 
+                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center">
+                <span>Upload to System</span>
+            </button>
+        </form>
+
+        <!-- Status Message -->
+        <div id="status" class="text-center text-sm hidden"></div>
+    </div>
+
+    <script>
+        // Initialize Telegram Web App theme adjustments if opened inside TG
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const WEBHOOK_URL = 'https://n8n.smca.digital/webhook/b2a11c85-29ab-43df-a58b-4a2b37146d7a';
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const status = document.getElementById('status');
+            
+            btn.disabled = true;
+            btn.textContent = 'Uploading...';
+            status.classList.add('hidden');
+
+            try {
+                const title = document.getElementById('title').value;
+                const link = document.getElementById('link').value;
+                const fileInput = document.getElementById('files');
+                
+                const filesArray = [];
+
+                // Convert selected files to base64 objects
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    const file = fileInput.files[i];
+                    const base64Data = await toBase64(file);
+                    filesArray.push({
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        data: base64Data
+                    });
+                }
+
+                const payload = {
+                    title: title,
+                    link: link,
+                    files: filesArray
+                };
+
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+                status.textContent = 'Successfully uploaded!';
+                status.className = 'text-center text-sm text-green-400';
+                status.classList.remove('hidden');
+
+                // Reset form
+                document.getElementById('uploadForm').reset();
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+            } catch (error) {
+                console.error(error);
+                status.textContent = `Upload failed: ${error.message}`;
+                status.className = 'text-center text-sm text-red-400';
+                status.classList.remove('hidden');
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Upload to System';
+            }
+        });
+
+        const toBase64 = file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    </script>
+</body>
+</html>
